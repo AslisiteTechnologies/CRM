@@ -35,6 +35,8 @@ import {
   type InteractiveMessagePayload,
 } from '@/lib/whatsapp/interactive';
 import { decrypt, encrypt, isLegacyFormat } from '@/lib/whatsapp/encryption';
+import { isValidHttpsImageUrl } from '@/lib/whatsapp/template-image-url';
+import { isDeliverableUrl } from '@/lib/webhooks/ssrf';
 import { supabaseAdmin } from '@/lib/flows/admin-client';
 import {
   phoneVariants,
@@ -341,6 +343,21 @@ export async function sendMessageToConversation(
     }
     templateRow = resolved.row;
     sendLanguage = resolved.language;
+  }
+
+  // Explicit IMAGE overrides must point to a public HTTPS destination.
+  // The server never fetches the image: Meta retrieves it when sending.
+  // DNS verification rejects private, local and non-routable targets.
+  // Existing legacy sends without an override retain their previous behavior.
+  const imageUrl = templateMessageParams && typeof templateMessageParams === 'object'
+    ? (templateMessageParams as { headerMediaUrl?: unknown }).headerMediaUrl
+    : undefined;
+  if (imageUrl !== undefined) {
+    if (messageType !== 'template' || !templateRow || templateRow.header_type !== 'image' ||
+        typeof imageUrl !== 'string' || !isValidHttpsImageUrl(imageUrl) ||
+        !(await isDeliverableUrl(imageUrl))) {
+      throw new SendMessageError('bad_request', 'Header image URL must be a public HTTPS URL', 400);
+    }
   }
 
   const attempt = async (phone: string): Promise<string> => {
