@@ -22,11 +22,13 @@ import {
   Loader2,
 } from "lucide-react";
 import { extractVariableIndices } from "@/lib/whatsapp/template-validators";
+import { isValidHttpsImageUrl } from "@/lib/whatsapp/template-image-url";
 import { useTranslations } from "next-intl";
 
 export interface TemplateSendValues {
   body: string[];
   headerText?: string;
+  headerMediaUrl?: string;
   buttonParams?: Record<number, string>;
 }
 
@@ -86,6 +88,7 @@ export function TemplatePicker({
   const [selected, setSelected] = useState<MessageTemplate | null>(null);
   const [params, setParams] = useState<string[]>([]);
   const [headerText, setHeaderText] = useState<string>("");
+  const [headerMediaUrl, setHeaderMediaUrl] = useState<string>("");
   const [buttonParams, setButtonParams] = useState<Record<number, string>>({});
 
   useEffect(() => {
@@ -136,6 +139,7 @@ export function TemplatePicker({
     setSelected(null);
     setParams([]);
     setHeaderText("");
+    setHeaderMediaUrl("");
     setButtonParams({});
   }
 
@@ -147,6 +151,7 @@ export function TemplatePicker({
   function pickTemplate(template: MessageTemplate) {
     const slots = collectVariableSlots(template);
     const noInputsNeeded =
+      template.header_type !== "image" &&
       slots.bodyVars.length === 0 &&
       slots.headerVarCount === 0 &&
       slots.urlButtonSlots.length === 0;
@@ -165,6 +170,7 @@ export function TemplatePicker({
     if (!selected) return;
     const values: TemplateSendValues = { body: params };
     if (headerText.trim()) values.headerText = headerText.trim();
+    if (selected.header_type === "image") values.headerMediaUrl = headerMediaUrl.trim();
     if (Object.keys(buttonParams).length > 0) {
       values.buttonParams = Object.fromEntries(
         Object.entries(buttonParams).map(([k, v]) => [Number(k), v.trim()]),
@@ -183,6 +189,7 @@ export function TemplatePicker({
     !!slots &&
     slots.bodyVars.every((_, i) => (params[i] ?? "").trim().length > 0) &&
     (slots.headerVarCount === 0 || headerText.trim().length > 0) &&
+    (selected.header_type !== "image" || isValidHttpsImageUrl(headerMediaUrl)) &&
     slots.urlButtonSlots.every(
       (s) => (buttonParams[s.index] ?? "").trim().length > 0,
     );
@@ -272,6 +279,29 @@ export function TemplatePicker({
                   placeholder={t("headerValuePlaceholder")}
                   className="border-border bg-muted text-foreground placeholder:text-muted-foreground"
                 />
+              </div>
+            )}
+            {selected.header_type === "image" && (
+              <div className="space-y-1">
+                <Label htmlFor="template-header-image-url" className="text-xs text-popover-foreground">
+                  Header Image URL (public HTTPS)
+                </Label>
+                <Input
+                  id="template-header-image-url"
+                  type="url"
+                  value={headerMediaUrl}
+                  onChange={(e) => setHeaderMediaUrl(e.target.value)}
+                  placeholder="https://example.com/demo-screenshot.png"
+                  className="border-border bg-muted text-foreground placeholder:text-muted-foreground"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Paste the public JPEG or PNG screenshot for this recipient. The URL must use HTTPS.
+                </p>
+                {headerMediaUrl && !isValidHttpsImageUrl(headerMediaUrl) && (
+                  <p role="alert" className="text-xs text-destructive">
+                    Enter a valid public HTTPS image URL (no localhost, IP address or credentials).
+                  </p>
+                )}
               </div>
             )}
             {slots?.bodyVars.map((v, i) => (
