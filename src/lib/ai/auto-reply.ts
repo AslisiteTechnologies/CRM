@@ -144,7 +144,8 @@ export async function dispatchInboundToAiReply(
 
     // Internal marker is never exposed in the customer-facing WhatsApp message.
     const qualifiedSalesLead = rawText.includes('[[SALES_LEAD]]')
-    const text = rawText.replaceAll('[[SALES_LEAD]]', '').trim()
+    const readyForQualification = rawText.includes('[[LEAD_QUALIFIED]]')
+    const text = rawText.replaceAll('[[SALES_LEAD]]', '').replaceAll('[[LEAD_QUALIFIED]]', '').trim()
 
     // Record token spend on the account's BYO key. Fire-and-forget so it
     // never adds latency to the customer-facing send: `logAiUsage`
@@ -172,6 +173,21 @@ export async function dispatchInboundToAiReply(
         if (dealError) console.error('[ai auto-reply] qualified deal creation failed:', dealError)
       } catch (dealErr) {
         console.error('[ai auto-reply] qualified deal creation failed:', dealErr)
+      }
+    }
+
+    // The same model response drives optional stage progression; no extra AI call.
+    // RPC only advances an existing open deal in New Lead. It never alters
+    // negotiated deals or creates a new deal from a qualification marker alone.
+    if (readyForQualification) {
+      try {
+        const { error: progressError } = await db.rpc('promote_ai_qualified_deal', {
+          p_account_id: accountId,
+          p_contact_id: contactId,
+        })
+        if (progressError) console.error('[ai auto-reply] deal qualification progression failed:', progressError)
+      } catch (progressErr) {
+        console.error('[ai auto-reply] deal qualification progression failed:', progressErr)
       }
     }
 
