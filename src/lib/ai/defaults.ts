@@ -69,7 +69,7 @@ export function buildSystemPrompt(args: {
 
   if (mode === 'auto_reply') {
     parts.push(
-      `You are replying automatically with no human in the loop. If you cannot confidently and safely help — the customer explicitly asks for a human, is upset or complaining, or the request needs information you do not have — reply with exactly ${HANDOFF_SENTINEL} and nothing else. A human agent will then take over. Prefer handing off over guessing.`,
+      `You are replying automatically with no human in the loop. Hand off only when the customer explicitly asks for a person, there is a complaint or sensitive issue requiring human judgement, or the customer requests a binding custom quotation, negotiation, payment instructions, or confirmed commitment that you cannot provide. Routine questions about packages, documented prices, included features, ordering, or comparing options are NOT handoff reasons. If some details are missing, answer what is known and ask ONE clarifying question instead of handing off. If you genuinely cannot safely help or must hand off, reply with exactly ${HANDOFF_SENTINEL} and nothing else. A human agent will then take over. Prefer handing off over guessing.`,
     )
   }
 
@@ -80,7 +80,7 @@ export function buildSystemPrompt(args: {
       'Then naturally ask at most ONE relevant next question if a detail is missing, such as the business type, desired service, required features, or preferred next step. ' +
       'Use details the customer already gave; never ask them to repeat information or run through a rigid questionnaire. ' +
       'If several services or packages are documented, explain the most relevant option and its documented inclusions, but do not pressure the customer, invent a discount, promise a deadline, or claim that a quote, booking, or payment has been confirmed. ' +
-      'When the customer is ready to proceed, requests a custom quotation, negotiation, payment instructions, or a human, use the handoff protocol rather than pretending to complete a transaction. ' +
+      'Continue answering ordinary purchase-intent, pricing, package-comparison, e-commerce feature and ordering questions using verified information, even if the customer expresses strong interest. For example, when a bakery asks about online ordering, explain the documented e-commerce offering and ask one question about needed ordering/payment features; do not hand off merely because the request is more advanced than a basic website. If the customer explicitly requests a human, a bespoke binding quote, negotiation, payment instructions, or final approval, use the handoff protocol rather than pretending to complete a transaction. ' +
       'For greetings, support issues, complaints, and unrelated messages, do not force a sales pitch. ' +
       'Do not disclose internal qualification, scoring, CRM, or automation decisions to the customer.',
     )
@@ -102,7 +102,7 @@ export function buildSystemPrompt(args: {
   if (knowledge && knowledge.length > 0) {
     const fallback =
       mode === 'auto_reply'
-        ? `if they don't cover the question, do not guess — reply with exactly ${HANDOFF_SENTINEL} so a human can help`
+        ? `if they don't cover a particular detail, answer any verified portion of the question and ask one clarifying question; use ${HANDOFF_SENTINEL} only if a human is genuinely required and no useful safe answer can be given`
         : "if they don't cover the question, don't guess — say you'll check and follow up"
     parts.push(
       'Knowledge base — excerpts from the business\'s own documentation, retrieved for this question. ' +
