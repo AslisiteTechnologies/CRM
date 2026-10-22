@@ -86,6 +86,15 @@ export function buildSystemPrompt(args: {
     )
   }
 
+  if (mode === 'auto_reply') {
+    parts.push(
+      'Internal CRM lead signal: If the customer clearly expresses genuine interest in purchasing or pricing a service from this business (including a business website, online store, or digital marketing), append the exact marker [[SALES_LEAD]] at the END of your customer-facing answer. ' +
+      'Do NOT append it for greetings alone, support for an existing purchase, complaints, irrelevant requests, or unclear intent. ' +
+      'This marker is internal metadata, not part of the customer message; never explain or quote it. ' +
+      'Only mark sales interest supported by the conversation. If handing off a genuine sales enquiry, output [[HANDOFF]][[SALES_LEAD]].'
+    )
+  }
+
   if (userPrompt && userPrompt.trim()) {
     parts.push(`Business context and instructions:\n${userPrompt.trim()}`)
   }

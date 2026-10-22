@@ -325,3 +325,43 @@ describe('dispatchInboundToAiReply — handoff', () => {
     })
   })
 })
+
+
+describe('AI-qualified sales deals', () => {
+  it('creates a deal from an AI-qualified website enquiry and strips the private marker', async () => {
+    h.generateReply.mockResolvedValue({
+      text: 'The START website is ₹5,000. [[SALES_LEAD]]',
+      handoff: false,
+    })
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.state.rpcCalls).toContainEqual({
+      name: 'create_ai_qualified_deal',
+      args: {
+        p_account_id: 'acct-1',
+        p_contact_id: 'contact-1',
+        p_user_id: 'user-1',
+      },
+    })
+    expect(h.engineSendText).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'The START website is ₹5,000.' }),
+    )
+  })
+
+  it('does not create a deal for an unqualified greeting', async () => {
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.state.rpcCalls.some((call) => call.name === 'create_ai_qualified_deal')).toBe(false)
+  })
+
+  it('keeps replying when deal creation fails', async () => {
+    h.generateReply.mockResolvedValue({
+      text: 'How can I help with your store? [[SALES_LEAD]]',
+      handoff: false,
+    })
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.engineSendText).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'How can I help with your store?' }),
+    )
+    errorSpy.mockRestore()
+  })
+})
