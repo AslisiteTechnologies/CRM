@@ -365,3 +365,45 @@ describe('AI-qualified sales deals', () => {
     errorSpy.mockRestore()
   })
 })
+
+
+describe('AI qualification stage progression', () => {
+  it('promotes an existing sales deal and strips both internal signals', async () => {
+    h.generateReply.mockResolvedValue({
+      text: 'The e-commerce package starts at ₹15,000. [[SALES_LEAD]][[LEAD_QUALIFIED]]',
+      handoff: false,
+    })
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.state.rpcCalls.map((call) => call.name)).toEqual([
+      'create_ai_qualified_deal',
+      'promote_ai_qualified_deal',
+      'claim_ai_reply_slot',
+    ])
+    expect(h.state.rpcCalls).toContainEqual({
+      name: 'promote_ai_qualified_deal',
+      args: { p_account_id: 'acct-1', p_contact_id: 'contact-1' },
+    })
+    expect(h.engineSendText).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'The e-commerce package starts at ₹15,000.' }),
+    )
+  })
+
+  it('does not promote an enquiry lacking the qualification signal', async () => {
+    h.generateReply.mockResolvedValue({
+      text: 'What kind of website do you need? [[SALES_LEAD]]',
+      handoff: false,
+    })
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.state.rpcCalls.some((call) => call.name === 'promote_ai_qualified_deal')).toBe(false)
+  })
+
+  it('does not create a deal solely from a qualification signal', async () => {
+    h.generateReply.mockResolvedValue({
+      text: 'What features do you need? [[LEAD_QUALIFIED]]',
+      handoff: false,
+    })
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.state.rpcCalls.some((call) => call.name === 'create_ai_qualified_deal')).toBe(false)
+    expect(h.state.rpcCalls.some((call) => call.name === 'promote_ai_qualified_deal')).toBe(true)
+  })
+})
