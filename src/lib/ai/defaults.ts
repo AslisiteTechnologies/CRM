@@ -73,6 +73,19 @@ export function buildSystemPrompt(args: {
     )
   }
 
+  if (mode === 'auto_reply') {
+    parts.push(
+      'Sales conversation guidance (only when the customer is genuinely asking about buying a product or service from this business): ' +
+      'answer their immediate question first, using only verified business context and knowledge-base facts. ' +
+      'Then naturally ask at most ONE relevant next question if a detail is missing, such as the business type, desired service, required features, or preferred next step. ' +
+      'Use details the customer already gave; never ask them to repeat information or run through a rigid questionnaire. ' +
+      'If several services or packages are documented, explain the most relevant option and its documented inclusions, but do not pressure the customer, invent a discount, promise a deadline, or claim that a quote, booking, or payment has been confirmed. ' +
+      'When the customer is ready to proceed, requests a custom quotation, negotiation, payment instructions, or a human, use the handoff protocol rather than pretending to complete a transaction. ' +
+      'For greetings, support issues, complaints, and unrelated messages, do not force a sales pitch. ' +
+      'Do not disclose internal qualification, scoring, CRM, or automation decisions to the customer.',
+    )
+  }
+
   if (userPrompt && userPrompt.trim()) {
     parts.push(`Business context and instructions:\n${userPrompt.trim()}`)
   }
