@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Sparkles, Hand, Undo2, Loader2 } from "lucide-react";
+import { Sparkles, Hand, Undo2, Loader2, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
@@ -48,6 +48,7 @@ export function AiThreadBanner({
   const { accountId } = useAuth();
   const [autoReplyOn, setAutoReplyOn] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
+  const [resetting, setResetting] = useState(false);
   // Optimistic local mirror of the pause flag so the banner flips
   // instantly on click; re-seeds whenever the thread (or its server
   // state via realtime) changes.
@@ -100,6 +101,26 @@ export function AiThreadBanner({
     [conversationId, currentUserId, onChange, t],
   );
 
+  const resetTest = useCallback(async () => {
+    if (!window.confirm('Reset AI test context for this chat? Old messages remain visible for audit, but AI will ignore them. Human assignment and AI handoff will be cleared.')) return;
+    setResetting(true);
+    try {
+      const res = await fetch(`/api/ai/test-reset/${conversationId}`, { method: 'POST' });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        toast.error(payload?.error ?? 'Could not reset AI test');
+        return;
+      }
+      setPaused(false);
+      onChange?.({ ai_autoreply_disabled: false, assigned_agent_id: null });
+      toast.success('AI test reset. Send a new WhatsApp message to begin.');
+    } catch {
+      toast.error('Network error while resetting AI test');
+    } finally {
+      setResetting(false);
+    }
+  }, [conversationId, onChange]);
+
   // Account has no auto-reply → nothing to show. (Still loading → nothing.)
   if (!autoReplyOn) return null;
 
@@ -115,6 +136,9 @@ export function AiThreadBanner({
             </p>
           )}
         </div>
+        <BannerButton onClick={resetTest} busy={resetting} icon={RotateCcw}>
+          Fresh AI test
+        </BannerButton>
         <BannerButton onClick={() => toggle(false)} busy={busy} icon={Undo2}>
           {t("resume")}
         </BannerButton>
@@ -134,6 +158,9 @@ export function AiThreadBanner({
           {t("activeText")}
         </span>
       </div>
+      <BannerButton onClick={resetTest} busy={resetting} icon={RotateCcw}>
+        Fresh AI test
+      </BannerButton>
       <BannerButton onClick={() => toggle(true)} busy={busy} icon={Hand}>
         {t("takeOver")}
       </BannerButton>
