@@ -177,7 +177,41 @@ export async function dispatchInboundToAiReply(
       if (config.handoffAgentId && !conv.assigned_agent_id) {
         update.assigned_agent_id = config.handoffAgentId
       }
-      await db.from('conversations').update(update).eq('id', conversationId)
+      // Atomically acquire this handoff: only the first concurrent webhook
+      // can transition an unpaused conversation. Subsequent deliveries
+      // cannot send a second acknowledgement.
+      const { data: paused, error: pauseErr } = await db
+        .from('conversations')
+        .update(update)
+        .eq('id', conversationId)
+        .eq('account_id', accountId)
+        .eq('ai_autoreply_disabled', false)
+        .is('assigned_agent_id', null)
+        .select('id')
+        .maybeSingle()
+      if (pauseErr) {
+        console.error('[ai auto-reply] handoff pause failed:', pauseErr)
+        return
+      }
+      if (!paused) return
+
+      // Pause BEFORE sending so another inbound cannot trigger the bot.
+      // Use a deterministic acknowledgement instead of trusting the
+      // model's partial text (which may contain unverified promises).
+      // Failed sends leave the conversation paused for human follow-up.
+      const acknowledgement = handoffAcknowledgement(latestUserMessage(messages))
+      try {
+        await engineSendText({
+          accountId,
+          userId: configOwnerUserId,
+          conversationId,
+          contactId,
+          text: acknowledgement,
+          aiGenerated: true,
+        })
+      } catch (sendErr) {
+        console.error('[ai auto-reply] handoff acknowledgement failed; AI remains paused:', sendErr)
+      }
       return
     }
 
@@ -262,4 +296,18 @@ async function showTypingIndicator(
   } catch (err) {
     console.warn('[ai auto-reply] typing indicator failed (continuing):', err)
   }
+}
+
+/**
+ * Customer-facing acknowledgement for an AI-to-human transfer.
+ * Deliberately short, without invented contact details or promises.
+ */
+function handoffAcknowledgement(message: string): string {
+  if (/[\u0D00-\u0D7F]/u.test(message)) {
+    return 'തീർച്ചയായും! ഞങ്ങളുടെ Aslisite ടീമിലേക്ക് ഈ സംഭാഷണം കൈമാറുന്നു. അവർ തുടർനടപടികളിൽ സഹായിക്കും.'
+  }
+  if (/[\u0900-\u097F]/u.test(message) || /\b(bhai|mujhe|aap|chahiye|batao|karna|hai|kya)\b/i.test(message)) {
+    return 'Bilkul! Main aapki chat Aslisite team ko hand over kar raha hoon. Team aage help karegi.'
+  }
+  return "Sure! I'll connect you with our Aslisite team. They'll help you with the next steps. 😊"
 }
