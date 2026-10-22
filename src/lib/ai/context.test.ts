@@ -6,11 +6,16 @@ import { buildConversationContext } from './context'
  *  from().select().eq().eq().order().limit() → { data, error }. */
 function fakeDb(rows: unknown[]): SupabaseClient {
   const chain = {
-    from: () => chain,
+    from: (table: string) => table === 'conversations' ? boundary : chain,
     select: () => chain,
     eq: () => chain,
     order: () => chain,
     limit: () => Promise.resolve({ data: rows, error: null }),
+  }
+  const boundary = {
+    select: () => boundary,
+    eq: () => boundary,
+    single: () => Promise.resolve({ data: { ai_context_reset_at: null }, error: null }),
   }
   return chain as unknown as SupabaseClient
 }
