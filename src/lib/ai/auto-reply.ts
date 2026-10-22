@@ -136,11 +136,15 @@ export async function dispatchInboundToAiReply(
       knowledge,
     })
 
-    const { text, handoff, usage } = await generateReply({
+    const { text: rawText, handoff, usage } = await generateReply({
       config,
       systemPrompt,
       messages,
     })
+
+    // Internal marker is never exposed in the customer-facing WhatsApp message.
+    const qualifiedSalesLead = rawText.includes('[[SALES_LEAD]]')
+    const text = rawText.replaceAll('[[SALES_LEAD]]', '').trim()
 
     // Record token spend on the account's BYO key. Fire-and-forget so it
     // never adds latency to the customer-facing send: `logAiUsage`
@@ -155,6 +159,21 @@ export async function dispatchInboundToAiReply(
       model: config.model,
       usage,
     })
+
+    // Reuse this same LLM response for qualification: no second provider call.
+    // Failure to create a deal must never block customer replies or handoff.
+    if (qualifiedSalesLead) {
+      try {
+        const { error: dealError } = await db.rpc('create_ai_qualified_deal', {
+          p_account_id: accountId,
+          p_contact_id: contactId,
+          p_user_id: configOwnerUserId,
+        })
+        if (dealError) console.error('[ai auto-reply] qualified deal creation failed:', dealError)
+      } catch (dealErr) {
+        console.error('[ai auto-reply] qualified deal creation failed:', dealErr)
+      }
+    }
 
     if (handoff || !text) {
       // The model can't (or shouldn't) answer — stop auto-replying on
