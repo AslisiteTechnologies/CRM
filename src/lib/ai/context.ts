@@ -21,11 +21,22 @@ export async function buildConversationContext(
   conversationId: string,
   limit: number = aiContextMessageLimit(),
 ): Promise<ChatMessage[]> {
-  const { data, error } = await db
+  const { data: boundary, error: boundaryError } = await db
+    .from('conversations')
+    .select('ai_context_reset_at')
+    .eq('id', conversationId)
+    .single()
+  if (boundaryError) throw boundaryError
+
+  let query = db
     .from('messages')
     .select('sender_type, content_text')
     .eq('conversation_id', conversationId)
     .eq('content_type', 'text')
+  if (boundary.ai_context_reset_at) {
+    query = query.gt('created_at', boundary.ai_context_reset_at)
+  }
+  const { data, error } = await query
     .order('created_at', { ascending: false })
     .limit(limit)
 
