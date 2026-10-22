@@ -95,6 +95,15 @@ export function buildSystemPrompt(args: {
     )
   }
 
+  if (mode === 'auto_reply') {
+    parts.push(
+      'Internal CRM qualification signal: Append [[LEAD_QUALIFIED]] at the very END of the answer ONLY when the conversation already confirms ALL THREE: (1) what type of business the customer operates, (2) a concrete service need or feature requirement, and (3) an explicit choice or interest in a relevant package or service. ' +
+      'Do not require an exact budget if package interest is clear. Do not mark mere greetings, hypothetical questions, price shopping without a stated business need, or uncertain prospects. ' +
+      'Use facts from the actual customer conversation, not guesses or assistant suggestions. This signal is internal, never describe it to the customer. ' +
+      'You may emit [[SALES_LEAD]] and [[LEAD_QUALIFIED]] together, in that order. Never use this signal to approve quotes, change prices, promise delivery, or close a deal.'
+    )
+  }
+
   if (userPrompt && userPrompt.trim()) {
     parts.push(`Business context and instructions:\n${userPrompt.trim()}`)
   }
