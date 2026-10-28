@@ -23,6 +23,7 @@ import { resumeAwaitingReply, runAutomationsForTrigger } from '@/lib/automations
 import { dispatchInboundToFlows } from '@/lib/flows/engine'
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver'
+import { notifyNewWhatsAppContact } from '@/lib/notifications/new-lead-whatsapp'
 import {
   applyBroadcastRecipientStatus,
   flagBroadcastReply,
@@ -874,7 +875,10 @@ async function processMessage(
   // manually-imported contacts sending for the first time. We dispatch both
   // so users can pick whichever semantic they want; an automation that
   // listens to only one trigger runs only when that trigger matches.
-  if (contactOutcome.wasCreated) automationTriggers.unshift('new_contact_created')
+  if (contactOutcome.wasCreated) {
+    automationTriggers.unshift('new_contact_created')
+    await notifyNewWhatsAppContact(accountId, contactRecord.id)
+  }
   if (isFirstInboundMessage) automationTriggers.unshift('first_inbound_message')
   // Awaited — not fire-and-forget. We're inside the route's `after()`
   // block, which only keeps the function alive for promises it can see, so
